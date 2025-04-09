@@ -1,12 +1,11 @@
 import chess
-import random
 import pygame
-import copy
 from evaluate import evaluate_board
 
 def minimax(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or board.is_game_over():
         return evaluate_board(board)
+
     if maximizing_player:
         max_eval = float('-inf')
         for move in board.legal_moves:
@@ -30,19 +29,34 @@ def minimax(board, depth, alpha, beta, maximizing_player):
                 break
         return min_eval
 
-def best_move(board, depth, time_limit=5000):
-    board_copy = copy.deepcopy(board)
-    best_move = None
+def best_move(board, depth):
+    ai_color = board.turn  # TRUE nếu là Trắng, FALSE nếu là Đen
+    best_move_found = None
     max_eval = float('-inf')
-    start_time = pygame.time.get_ticks()
-    moves = sorted(board_copy.legal_moves, key=lambda m: board_copy.is_capture(m), reverse=True)
+
+    def move_score(board, move):
+        score = 0
+        if board.is_capture(move):
+            victim = board.piece_at(move.to_square)
+            attacker = board.piece_at(move.from_square)
+            if victim and attacker:
+                score += 10 * victim.piece_type - attacker.piece_type
+        if board.gives_check(move):
+            score += 3
+        return score
+
+    moves = sorted(board.legal_moves, key=lambda m: move_score(board, m), reverse=True)
+
     for move in moves:
-        if pygame.time.get_ticks() - start_time > time_limit:
-            break
-        board_copy.push(move)
-        eval = minimax(board_copy, depth - 1, float('-inf'), float('inf'), False)
-        board_copy.pop()
+        board.push(move)
+        eval = minimax(board, depth - 1, float('-inf'), float('inf'), False)
+        board.pop()
+
+        # 🧠 Nếu AI là Đen, đảo dấu lại để Đen chọn điểm thấp
+        eval = eval if ai_color == chess.WHITE else -eval
+
         if eval > max_eval:
             max_eval = eval
-            best_move = move
-    return best_move or random.choice(list(board.legal_moves))
+            best_move_found = move
+
+    return best_move_found if best_move_found else moves[0]
