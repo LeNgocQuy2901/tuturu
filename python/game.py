@@ -67,9 +67,13 @@ class Game:
         return chess.Move(from_sq, to_sq)
 
     def ai_move_thread(self, board_state):
+        import time
+        from ai import best_move  # best_move có hỗ trợ time limit
+
         self.ai_thinking = True
         self.ai_move_time = pygame.time.get_ticks()
 
+        start = time.time()
         try:
             with chess.polyglot.open_reader("baron30.bin") as reader:
                 try:
@@ -77,14 +81,17 @@ class Game:
                     self.ai_move = entry.move
                     print(f"[AI] Sử dụng opening book: {self.ai_move}")
                 except IndexError:
-                    print("[AI] Không có nước trong opening book. Dùng minimax.")
-                    self.ai_move = best_move(board_state, depth=3)
+                    print("[AI] Không có nước trong opening book. Đang dùng minimax...")
+                    self.ai_move = best_move(board_state, max_time=9.5)
         except Exception as e:
             print("[Lỗi] Mở file book thất bại:", e)
-            self.ai_move = best_move(board_state, depth=3)
+            print("[AI] Đang dùng minimax không cần opening book...")
+            self.ai_move = best_move(board_state, max_time=9.5)
 
+        end = time.time()
+        print(f"[AI] Thời gian suy nghĩ: {end - start:.2f} giây")
+        print(f"[AI] Chọn nước: {self.ai_move}")
         self.ai_thinking = False
-
 
     def update_ai_move(self):
         if self.ai_move and not self.ai_thinking and pygame.time.get_ticks() - self.ai_move_time >= 1000:

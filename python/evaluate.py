@@ -461,66 +461,105 @@ def evaluate_turn_and_endgame_push(board, is_endgamechua, current_value):
             value -= 20
 
     return value
-def evaluate_board(board):
+def evaluate_board(board: chess.Board) -> float:
+    if board.is_checkmate():
+        return -9999 if board.turn else 9999
+    if board.is_stalemate() or board.is_insufficient_material():
+        return 0
 
-    white_pieces = {piece_type: board.pieces(piece_type, chess.WHITE) for piece_type in piece_values}
-    black_pieces = {piece_type: board.pieces(piece_type, chess.BLACK) for piece_type in piece_values}
+    material = {
+        chess.PAWN: 100,
+        chess.KNIGHT: 320,
+        chess.BISHOP: 330,
+        chess.ROOK: 500,
+        chess.QUEEN: 900,
+        chess.KING: 0
+    }
 
-    white_attacks = chess.SquareSet()
-    black_attacks = chess.SquareSet()
+    pst = {
+        chess.PAWN: [
+            0, 0, 0, 0, 0, 0, 0, 0,
+            5, 10, 10, -20, -20, 10, 10, 5,
+            5, -5, -10, 0, 0, -10, -5, 5,
+            0, 0, 0, 20, 20, 0, 0, 0,
+            5, 5, 10, 25, 25, 10, 5, 5,
+            10, 10, 20, 30, 30, 20, 10, 10,
+            50, 50, 50, 50, 50, 50, 50, 50,
+            0, 0, 0, 0, 0, 0, 0, 0
+        ],
+        chess.KNIGHT: [
+            -50, -40, -30, -30, -30, -30, -40, -50,
+            -40, -20, 0, 5, 5, 0, -20, -40,
+            -30, 5, 10, 15, 15, 10, 5, -30,
+            -30, 0, 15, 20, 20, 15, 0, -30,
+            -30, 5, 15, 20, 20, 15, 5, -30,
+            -30, 0, 10, 15, 15, 10, 0, -30,
+            -40, -20, 0, 0, 0, 0, -20, -40,
+            -50, -40, -30, -30, -30, -30, -40, -50
+        ]
+        # Add more PSTs for bishop, rook, queen, king if needed
+    }
 
-    for square in chess.SQUARES:
-        if board.color_at(square) == chess.WHITE:
-            white_attacks |= board.attacks(square)
-        elif board.color_at(square) == chess.BLACK:
-            black_attacks |= board.attacks(square)
+    score = 0
+    piece_map = board.piece_map()
 
-    # Tính toán cơ bản
-    value = 0
-    for piece_type, value_piece in piece_values.items():
-        value += len(white_pieces[piece_type]) * value_piece
-        value -= len(black_pieces[piece_type]) * value_piece
+    white_development = 0
+    black_development = 0
 
-    # Tính điểm vị trí theo bảng piece-square tables (bạn có thể thêm sau nếu muốn)
-    value += evaluate_material_and_position(board, is_endgame(board))
+    white_center_control = 0
+    black_center_control = 0
 
-    # Tính kiểm soát trung tâm
-    value += evaluate_piece_control_center(board)
+    white_king_safety = 0
+    black_king_safety = 0
 
-    # Cấu trúc tốt
-    value += evaluate_pawn_structure(
-        list(white_pieces[chess.PAWN]), chess.WHITE,
-        white_pieces[chess.PAWN], black_pieces[chess.PAWN]
-    )
-    value += evaluate_pawn_structure(
-        list(black_pieces[chess.PAWN]), chess.BLACK,
-        white_pieces[chess.PAWN], black_pieces[chess.PAWN]
-    )
+    for square, piece in piece_map.items():
+        value = material[piece.piece_type]
+        if piece.color == chess.WHITE:
+            score += value
+            if piece.piece_type in pst:
+                score += pst[piece.piece_type][square]
 
-    # An toàn vua
-    value += evaluate_king_safety(board, white_attacks, black_attacks)
+            if piece.piece_type in [chess.KNIGHT, chess.BISHOP] and square not in [chess.B1, chess.G1, chess.C1, chess.F1]:
+                white_development += 1
 
-    # Vị trí vua + nhập thành
-    value += evaluate_king_positioning(board)
-    value += evaluate_check_and_castling(board)
+            if square in [chess.E4, chess.D4, chess.E5, chess.D5, chess.C4, chess.F4, chess.C5, chess.F5]:
+                white_center_control += 1
+        else:
+            score -= value
+            if piece.piece_type in pst:
+                score -= pst[piece.piece_type][chess.square_mirror(square)]
 
-    # Cặp tượng
-    value += evaluate_bishop_pair(board)
+            if piece.piece_type in [chess.KNIGHT, chess.BISHOP] and square not in [chess.B8, chess.G8, chess.C8, chess.F8]:
+                black_development += 1
 
-    # Outposts
-    value += evaluate_outposts(board)
+            if square in [chess.E4, chess.D4, chess.E5, chess.D5, chess.C4, chess.F4, chess.C5, chess.F5]:
+                black_center_control += 1
 
-    # Không gian và kiểm soát lãnh thổ
-    value += evaluate_space_advantage(board, white_attacks, black_attacks)
-    value += evaluate_enemy_territory_control(board, white_attacks, black_attacks)
+    score += 15 * (white_development - black_development)
+    score += 20 * (white_center_control - black_center_control)
 
-    # Đe dọa
-    value += evaluate_threats(board, piece_values)
+    # King safety: bonus if castled
+    if board.has_kingside_castling_rights(chess.WHITE) or board.has_queenside_castling_rights(chess.WHITE):
+        score += 20
+    if board.has_kingside_castling_rights(chess.BLACK) or board.has_queenside_castling_rights(chess.BLACK):
+        score -= 20
 
-    # Ưu tiên lượt đi + tàn cuộc push
-    value += evaluate_turn_and_endgame_push(board, is_endgame, value)
+    # Mobility: number of legal moves
+    white_mobility = len(list(board.legal_moves)) if board.turn == chess.WHITE else 0
+    board.push(chess.Move.null())
+    black_mobility = len(list(board.legal_moves)) if board.turn == chess.BLACK else 0
+    board.pop()
+    score += 0.1 * (white_mobility - black_mobility)
 
-    return value
+    # Open file for rook bonus
+    for file in range(8):
+        white_rook_on_file = any(piece_map.get(chess.square(file, rank)) == chess.Piece(chess.ROOK, chess.WHITE) for rank in range(8))
+        black_rook_on_file = any(piece_map.get(chess.square(file, rank)) == chess.Piece(chess.ROOK, chess.BLACK) for rank in range(8))
+        file_has_pawn = any(piece_map.get(chess.square(file, rank)) and piece_map.get(chess.square(file, rank)).piece_type == chess.PAWN for rank in range(8))
 
+        if white_rook_on_file and not file_has_pawn:
+            score += 10
+        if black_rook_on_file and not file_has_pawn:
+            score -= 10
 
-
+    return score if board.turn == chess.WHITE else -score
