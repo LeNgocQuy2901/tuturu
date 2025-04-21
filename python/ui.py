@@ -1,17 +1,11 @@
 import pygame
 import chess
 
-BOARD_WIDTH, HEIGHT = 600, 600
-SIDEBAR_WIDTH = 120
-WIDTH = BOARD_WIDTH + SIDEBAR_WIDTH
-SQUARE_SIZE = BOARD_WIDTH // 8
-
+WIDTH, HEIGHT = 600, 600
+SQUARE_SIZE = WIDTH // 8
 WHITE = (240, 217, 181)
 BROWN = (181, 136, 99)
 HIGHLIGHT = (186, 202, 68)
-SIDEBAR_BG = (30, 30, 30)
-TEXT_COLOR = (255, 255, 255)
-BUTTON_COLOR = (200, 50, 50)
 
 PIECE_IMAGES = {}
 PIECES = ['p', 'r', 'n', 'b', 'q', 'k', 'p1', 'r1', 'n1', 'b1', 'q1', 'k1']
@@ -44,16 +38,21 @@ def highlight_moves(screen, board, square):
         col, row = chess.square_file(move.to_square), 7 - chess.square_rank(move.to_square)
         pygame.draw.circle(screen, HIGHLIGHT,
                            (col * SQUARE_SIZE + SQUARE_SIZE // 2, row * SQUARE_SIZE + SQUARE_SIZE // 2), 10)
+        
+def draw_promotion_choices(screen, color):
+    options = [chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT]
+    names = ['q', 'r', 'b', 'n']
+    if color == chess.WHITE:
+        names = [n + '1' for n in names]
 
-def draw_sidebar(screen, font, depth, ai_time, exit_button_rect):
-    pygame.draw.rect(screen, SIDEBAR_BG, (BOARD_WIDTH, 0, SIDEBAR_WIDTH, HEIGHT))
-
-    depth_text = font.render(f"Độ sâu: {depth}", True, TEXT_COLOR)
-    time_text = font.render(f"Thời gian: {ai_time:.2f}s", True, TEXT_COLOR)
-
-    screen.blit(depth_text, (BOARD_WIDTH + 10, 50))
-    screen.blit(time_text, (BOARD_WIDTH + 10, 100))
-
-    pygame.draw.rect(screen, BUTTON_COLOR, exit_button_rect)
-    exit_text = font.render("Thoát", True, TEXT_COLOR)
-    screen.blit(exit_text, exit_button_rect.move(10, 10))
+    for i, name in enumerate(names):
+        rect = pygame.Rect(i * 75 + 150, 225, 75, 75)
+        pygame.draw.rect(screen, (200, 200, 200), rect)
+        screen.blit(PIECE_IMAGES[name], (i * 75 + 150, 225))
+def get_promotion_choice(pos, color):
+    x, y = pos
+    if 225 <= y <= 300 and 150 <= x <= 450:
+        index = (x - 150) // 75
+        options = [chess.QUEEN, chess.ROOK, chess.BISHOP, chess.KNIGHT]
+        return options[index]
+    return None

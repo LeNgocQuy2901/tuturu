@@ -1,24 +1,25 @@
 import pygame
-import threading
 import chess
 import copy
-import chess.polyglot
-from ai import best_move
+from ai import AI
 
 class Game:
     def __init__(self):
         self.board = chess.Board()
-        self.view_board = chess.Board()  # Board để xem lại
-        self.history_index = 0           # Chỉ số để biết đang xem tới bước thứ mấy
+        self.view_board = self.board.copy()  # Khởi tạo view_board đồng bộ
+        self.history_index = 0
         self.selected_square = None
         self.ai_thinking = False
         self.ai_color = chess.BLACK
-        self.ai_move = None
         self.ai_move_time = 0
         self.clock = pygame.time.Clock()
         self.running = True
+        self.ai = AI()
+        print("[Debug] Khởi tạo Game instance")  # Debug để phát hiện khởi tạo lại
 
     def handle_event(self, event):
+        if not self.running:
+            return  # Không xử lý sự kiện nếu trò chơi kết thúc
         if event.type == pygame.MOUSEBUTTONDOWN and not self.ai_thinking:
             x, y = pygame.mouse.get_pos()
             col, row = x // 75, y // 75
@@ -31,13 +32,11 @@ class Game:
                 if move in self.board.legal_moves:
                     self.board.push(move)
                     self.history_index = len(self.board.move_stack)
-                    self.view_board = self.board.copy()
-
-                    self.sync_view_board()
+                    self.view_board = self.board.copy()  # Đồng bộ view_board
                     self.check_game_end()
                     if not self.board.turn and not self.ai_thinking:
-                        board_copy = copy.deepcopy(self.board)
-                        threading.Thread(target=self.ai_move_thread, args=(board_copy,), daemon=True).start()
+                        self.ai_thinking = True
+                        self.ai_move_time = pygame.time.get_ticks()
                 self.selected_square = None
 
         elif event.type == pygame.KEYDOWN:
@@ -48,15 +47,11 @@ class Game:
                 self.history_index = min(len(self.board.move_stack), self.history_index + 1)
                 self.update_view_board()
 
-    def sync_view_board(self):
-        self.history_index = len(self.board.move_stack)
-        self.update_view_board()
-
     def update_view_board(self):
+        """Cập nhật view_board dựa trên history_index"""
         self.view_board = chess.Board()
         for move in self.board.move_stack[:self.history_index]:
             self.view_board.push(move)
-
 
     def create_move(self, from_sq, to_sq):
         piece = self.board.piece_at(from_sq)
@@ -66,42 +61,12 @@ class Game:
                 return chess.Move(from_sq, to_sq, promotion=chess.QUEEN)
         return chess.Move(from_sq, to_sq)
 
-    def ai_move_thread(self, board_state):
-        import time
-        from ai import best_move  # best_move có hỗ trợ time limit
-
-        self.ai_thinking = True
-        self.ai_move_time = pygame.time.get_ticks()
-
-        start = time.time()
-        try:
-            with chess.polyglot.open_reader("baron30.bin") as reader:
-                try:
-                    entry = reader.find(board_state)
-                    self.ai_move = entry.move
-                    print(f"[AI] Sử dụng opening book: {self.ai_move}")
-                except IndexError:
-                    print("[AI] Không có nước trong opening book. Đang dùng minimax...")
-                    self.ai_move = best_move(board_state, max_time=9.5)
-        except Exception as e:
-            print("[Lỗi] Mở file book thất bại:", e)
-            print("[AI] Đang dùng minimax không cần opening book...")
-            self.ai_move = best_move(board_state, max_time=9.5)
-
-        end = time.time()
-        print(f"[AI] Thời gian suy nghĩ: {end - start:.2f} giây")
-        print(f"[AI] Chọn nước: {self.ai_move}")
-        self.ai_thinking = False
-
     def update_ai_move(self):
-        if self.ai_move and not self.ai_thinking and pygame.time.get_ticks() - self.ai_move_time >= 1000:
-            if self.ai_move in self.board.legal_moves:
-                self.board.push(self.ai_move)
-                self.history_index = len(self.board.move_stack)
-                self.view_board = self.board.copy()
-
-                self.check_game_end()
-            self.ai_move = None
+        if self.running and not self.board.turn and self.ai_thinking and pygame.time.get_ticks() - self.ai_move_time >= 1000:
+            board_copy = copy.deepcopy(self.board)
+            self.ai.update_ai_move(self, board_copy)
+            self.view_board = self.board.copy()  # Đồng bộ view_board sau nước đi AI
+            self.ai_thinking = False
 
     def check_game_end(self):
         if self.board.is_checkmate():
@@ -119,17 +84,6 @@ class Game:
         elif self.board.can_claim_threefold_repetition():
             print("Hòa do lặp lại vị trí!")
             self.running = False
-def reset_board(self):
-    import chess
-    self.board = chess.Board()
 
-def push_move_uci(self, move_uci):
-    import chess
-    move = chess.Move.from_uci(move_uci)
-    if move in self.board.legal_moves:
-        self.board.push(move)
-
-def get_best_move(self):
-    from ai import best_move  # nếu bạn viết AI ở ai.py
-    move = best_move(self.board)
-    return move.uci()
+    def getValidMoves(self):
+        return [move for move in self.board.legal_moves]

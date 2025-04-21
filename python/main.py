@@ -2,67 +2,43 @@ import pygame
 from ui import draw_board, draw_pieces, highlight_moves
 from game import Game
 
-WIDTH, HEIGHT = 600, 600
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Chess Game")
+# Kiểm tra xem module đã được nhập chưa để tránh chạy lại
+if __name__ == "__main__":
+    WIDTH, HEIGHT = 600, 600
+    pygame.init()
+    # Kiểm tra xem cửa sổ đã tồn tại chưa
+    try:
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Chess Game")
+    except pygame.error as e:
+        print(f"[Lỗi] Không thể tạo cửa sổ mới: {e}")
+        pygame.quit()
+        exit()
 
-font = pygame.font.SysFont(None, 48)
+    game = Game()
+    running = True
 
-def main_menu(screen):
-    background = pygame.image.load("assets/background.jpg")
-    background = pygame.transform.scale(background, (WIDTH, HEIGHT))
-
-    button_rect = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 25, 200, 50)
-    waiting = True
-    while waiting:
-        screen.blit(background, (0, 0))  # Vẽ ảnh nền
-
-        # Vẽ nút "Chơi Game"
-        pygame.draw.rect(screen, (70, 130, 180), button_rect)
-        text_surface = font.render("Play Game", True, (255, 255, 255))
-        text_rect = text_surface.get_rect(center=button_rect.center)
-        screen.blit(text_surface, text_rect)
-
-        pygame.display.flip()
-
+    while running and game.running:  # Kiểm tra cả trạng thái game
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                exit()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if button_rect.collidepoint(event.pos):
-                    waiting = False
+                running = False
+            else:
+                game.handle_event(event)
 
+        screen.fill((0, 0, 0))  # Xóa màn hình trước khi vẽ
+        draw_board(screen)  # Vẽ bàn cờ
+        draw_pieces(screen, game.view_board)  # Vẽ quân cờ từ view_board
+        if game.selected_square is not None and game.history_index == len(game.board.move_stack):
+            highlight_moves(screen, game.view_board, game.selected_square)
 
-# Gọi menu trước khi khởi tạo game
-main_menu(screen)
+        game.update_ai_move()
 
-# Sau khi nhấn "Chơi Game", bắt đầu trò chơi
-game = Game()
-running = True
-
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        if game.history_index < len(game.board.move_stack):
+            pygame.display.set_caption(f"Chess Game - Đang xem lại bước {game.history_index}/{len(game.board.move_stack)}")
         else:
-            game.handle_event(event)
+            pygame.display.set_caption("Chess Game")
 
-    screen.fill((0, 0, 0))
-    draw_board(screen)
-    draw_pieces(screen, game.view_board)
-    if game.selected_square is not None and game.history_index == len(game.board.move_stack):
-        highlight_moves(screen, game.view_board, game.selected_square)
+        pygame.display.flip()
+        game.clock.tick(60)
 
-    game.update_ai_move()
-
-    if game.history_index < len(game.board.move_stack):
-        pygame.display.set_caption(f"Chess Game - Đang xem lại bước {game.history_index}/{len(game.board.move_stack)}")
-    else:
-        pygame.display.set_caption("Chess Game")
-
-    pygame.display.flip()
-    game.clock.tick(60)
-
-pygame.quit()
+    pygame.quit()
