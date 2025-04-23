@@ -3,7 +3,7 @@ import time
 import chess.polyglot
 from threading import Thread
 from queue import Queue
-from searcher import Searcher  
+from search import Searcher  
 class AI:
     def __init__(self):
         self.move = None
